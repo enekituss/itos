@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recuento Bus</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f9f9f9; }
+    .screen { max-width: 600px; margin: auto; padding: 20px; background: white; min-height: 100vh; box-sizing: border-box; }
+    input, button, textarea { width: 100%; margin-top: 10px; padding: 12px; font-size: 1em; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    .parada { background: black; color: white; padding: 10px; margin: 10px 0; border-radius: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .small { font-size: 0.9em; opacity: 0.8; }
+    .pasajeros-container { background: #f1f1f1; margin-top: 5px; border-radius: 5px; padding: 10px; }
+    .pasajero { border-bottom: 1px solid #ccc; padding: 8px 0; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; }
+    .pasajero div { flex: 1; }
+    .pasajero input[type="checkbox"] { width: 20px; height: 20px; }
+    .icono { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; }
+    .footer-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .hidden { display: none; }
+    .persona { background: #e0e0e0; padding: 20px; margin-top: 10px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
+    .persona .nombre { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
+    .persona .icono { width: 30px; height: 30px; margin-bottom: 10px; }
+    .persona .info { font-size: 1em; margin-bottom: 10px; }
+    .persona .embarcar { cursor: pointer; padding: 8px 12px; border-radius: 6px; background-color: #ccc; }
+    .persona .embarcar.embarcado { background-color: blue; color: white; }
+    .persona .embarcar:hover { background-color: #bbb; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="screen" id="loginScreen">
+  <h2>Iniciar sesión</h2>
+  <input type="text" id="user" placeholder="Usuario">
+  <input type="password" id="pass" placeholder="Contraseña">
+  <button onclick="login()">Entrar</button>
+</div>
+
+<!-- MENÚ -->
+<div class="screen hidden" id="menuScreen">
+  <h2>Menú principal</h2>
+  <button onclick="continuarViaje()">Continuar viaje</button>
+  <button onclick="mostrarInicioViaje()">Iniciar viaje nuevo</button>
+</div>
+
+<!-- NUEVO VIAJE -->
+<div class="screen hidden" id="inicioViajeScreen">
+  <h2>Nuevo Viaje</h2>
+  <input type="number" id="plazas" placeholder="Número de plazas del autobús">
+  <textarea id="paradas" placeholder="Introduce las paradas (una por línea)"></textarea>
+  <button onclick="confirmarViaje()">Confirmar</button>
+</div>
+
+<!-- PARADAS -->
+<div class="screen hidden" id="paradasScreen">
+  <h2>Paradas del viaje</h2>
+  <div id="listaParadas"></div>
+  <div class="footer-buttons">
+    <button onclick="finalizarViaje()">Finalizar viaje</button>
+    <button onclick="mostrarResumen()">Ver resumen</button>
+  </div>
+  <div id="resumen"></div>
+</div>
+
+<script>
+  const usuarioValido = "11285";
+  const passValido = "EC2008";
+  let viajeActivo = false;
+  let paradas = [];
+  let plazas = 0;
+  let ocupadas = 0;
+  let datosParadas = [];
+  let historial = [];
+
+  let nombres = ["Juan", "Ana", "Luis", "Carlos", "Laura", "Elena", "José", "Sara", "Manuel", "Lucía", "Pedro", "Sofía", "David", "Marta", "Álvaro", "Carmen", "Jorge", "Paula", "Rubén", "Natalia", "Andrés", "Irene", "Diego", "Raquel", "Iván", "Clara", "Hugo", "Inés", "Víctor", "Noelia"];
+  let apellidos = ["García", "López", "Martínez", "Sánchez", "Pérez", "Gómez", "Fernández", "Ruiz", "Díaz", "Moreno", "Alonso", "Navarro", "Romero", "Torres", "Domínguez", "Gil", "Vargas", "Castro", "Suárez", "Ortiz", "Rubio", "Molina", "Delgado", "Cano", "Marín", "Ibáñez", "Reyes", "Silva", "Santos", "Méndez"];
+
+  function login() {
+    const u = document.getElementById('user').value;
+    const p = document.getElementById('pass').value;
+    if (u === usuarioValido && p === passValido) {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('menuScreen').classList.remove('hidden');
+    } else {
+      alert("Usuario o contraseña incorrectos.");
+    }
+  }
+
+  function mostrarInicioViaje() {
+    if (viajeActivo) {
+      alert("Ya hay un viaje en curso.");
+      return;
+    }
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('inicioViajeScreen').classList.remove('hidden');
+  }
+
+  function continuarViaje() {
+    if (!viajeActivo) {
+      alert("No hay ningún viaje activo.");
+      return;
+    }
+    mostrarParadas();
+  }
+
+  function confirmarViaje() {
+    plazas = parseInt(document.getElementById('plazas').value);
+    const textoParadas = document.getElementById('paradas').value.trim();
+    if (!plazas || textoParadas === "") {
+      alert("Rellena todos los campos.");
+      return;
+    }
+    paradas = textoParadas.split("\n").map(p => p.trim());
+    viajeActivo = true;
+    datosParadas = [];
+    generarDatosParadas();
+    document.getElementById('inicioViajeScreen').classList.add('hidden');
+    mostrarParadas();
+  }
+
+  function generarDatosParadas() {
+    ocupadas = 0;
+    datosParadas = paradas.map((p, i) => {
+      let suben = 0, bajan = 0;
+      let pasajeros = [];
+
+      if (i === 0) {
+        suben = Math.floor(Math.random() * plazas);
+        ocupadas += suben;
+      } else if (i === paradas.length - 1) {
+        bajan = ocupadas;
+        ocupadas = 0;
+      } else {
+        bajan = Math.floor(Math.random() * ocupadas);
+        ocupadas -= bajan;
+        const maxSuben = plazas - ocupadas;
+        suben = Math.floor(Math.random() * (maxSuben + 1));
+        ocupadas += suben;
+      }
+
+      for (let j = 0; j < suben; j++) {
+        const nombre = generarNombre();
+        const plaza = Math.floor(Math.random() * plazas) + 1;
+        const localizador = plaza + generarLetras(4);
+        pasajeros.push({ nombre, plaza, localizador, embarcado: false, tipo: 'sube' });
+      }
+
+      for (let j = 0; j < bajan; j++) {
+        const nombre = generarNombre();
+        const plaza = Math.floor(Math.random() * plazas) + 1;
+        const localizador = plaza + generarLetras(4);
+        pasajeros.push({ nombre, plaza, localizador, embarcado: false, tipo: 'baja' });
+      }
+
+      pasajeros.sort((a, b) => a.plaza - b.plaza);
+
+      return {
+        nombre: p,
+        suben,
+        bajan,
+        ocupadasActual: ocupadas,
+        pasajeros,
+        desplegado: false
+      };
+    });
+  }
+
+  function generarNombre() {
+    const nombre = nombres[Math.floor(Math.random() * nombres.length)];
+    const apellido = apellidos[Math.floor(Math.random() * apellidos.length)];
+    return ${nombre} ${apellido};
+  }
+
+  function generarLetras(n) {
+    const letras = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let resultado = "";
+    for (let i = 0; i < n; i++) {
+      resultado += letras.charAt(Math.floor(Math.random() * letras.length));
+    }
+    return resultado;
+  }
+
+  function mostrarParadas() {
+    document.getElementById('menuScreen').classList.add('hidden');
+    document.getElementById('paradasScreen').classList.remove('hidden');
+    const lista = document.getElementById('listaParadas');
+    lista.innerHTML = "";
+
+    datosParadas.forEach((p, i) => {
+      const contenedor = document.createElement('div');
+      const paradaDiv = document.createElement('div');
+      paradaDiv.className = 'parada';
+      paradaDiv.innerHTML = 
+        <strong>${p.nombre}</strong>
+        <div class="small">Suben: ${p.suben} | Bajan: ${p.bajan} | Ocupadas: ${p.ocupadasActual}</div>
+      ;
+      paradaDiv.onclick = () => {
+        p.desplegado = !p.desplegado;
+        mostrarParadas();
+      };
+      contenedor.appendChild(paradaDiv);
+
+      if (p.desplegado) {
+        const detallesDiv = document.createElement('div');
+        detallesDiv.className = 'pasajeros-container';
+        p.pasajeros.forEach((pasajero, idx) => {
+          const div = document.createElement('div');
+          div.className = 'pasajero';
+          const icono = pasajero.tipo === 'sube' ? '<img src="https://cdn.pixabay.com/photo/2017/05/11/12/24/green-2304008_1280.png" class="icono">' : '<img src="https://w7.pngwing.com/pngs/659/157/png-transparent-arrow-computer-icons-red-arrow-angle-rectangle-triangle.png" class="icono">';
+          div.innerHTML = 
+            <div>${icono}${pasajero.nombre}</div>
+            <div>Plaza: ${pasajero.plaza}</div>
+            <div>${pasajero.localizador}</div>
+            <div><input type="checkbox" onchange="marcarEmbarcado(${i}, ${idx}, this.checked)" ${pasajero.embarcado ? "checked" : ""}></div>
+          ;
+          detallesDiv.appendChild(div);
+        });
+        contenedor.appendChild(detallesDiv);
+      }
+
+      lista.appendChild(contenedor);
+    });
+  }
+
+  function marcarEmbarcado(paradaIdx, pasajeroIdx, estado) {
+    datosParadas[paradaIdx].pasajeros[pasajeroIdx].embarcado = estado;
+  }
+
+  function finalizarViaje() {
+    if (!viajeActivo) return;
+    historial.push(JSON.parse(JSON.stringify(datosParadas)));
+    alert("Viaje finalizado y guardado en el historial.");
+    viajeActivo = false;
+    datosParadas = [];
+    document.getElementById('paradasScreen').classList.add('hidden');
+    document.getElementById('menuScreen').classList.remove('hidden');
+  }
+
+  function mostrarResumen() {
+    const contenedor = document.getElementById('resumen');
+    contenedor.innerHTML = "<h3>Resumen del Viaje</h3>";
+    let totalSuben = 0, totalBajan = 0;
+    datosParadas.forEach(p => {
+      totalSuben += p.suben;
+      totalBajan += p.bajan;
+    });
+    contenedor.innerHTML += <p>Total de pasajeros que subieron: ${totalSuben}</p>;
+    contenedor.innerHTML += <p>Total de pasajeros que bajaron: ${totalBajan}</p>;
+  }
+</script>
+
+</body>
+</html>
